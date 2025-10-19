@@ -7,16 +7,12 @@ import usersRoutes from './routes/users.js';
 
 dotenv.config();
 const app = express();
-const allowedOrigins = [
-  'http://localhost:8081',
-  'http://localhost:19006',     // Expo Dev Tools
-  'exp://192.168.0.*:19000',    // Expo en red local
-  'http://192.168.0.*:19006',   // Alternativa Expo
-];
 
 app.use(cors({
-  origin: allowedOrigins,
-  credentials: true
+  origin: '*', 
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json());
