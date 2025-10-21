@@ -5,8 +5,7 @@ import productsRoutes from './routes/products.js';
 import ordersRoutes from './routes/orders.js';
 import usersRoutes from './routes/users.js';
 
-
-if (process.env.NODE_ENV !== 'production') {
+if (!process.env.DATABASE_URL) {
   dotenv.config();
 } 
 
@@ -29,6 +28,5 @@ app.get('/', (req, res) => {
   res.send('API Gasgo funcionando 🔥');
 });
 
-// Railway inyecta el puerto. Si no lo encuentra, usa 3000 (para local).
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));

@@ -3,7 +3,8 @@ const { Pool } = pkg;
 import dotenv from 'dotenv';
 
 
-if (process.env.NODE_ENV !== 'production') {
+
+if (!process.env.DATABASE_URL) {
   dotenv.config();
 }
 
