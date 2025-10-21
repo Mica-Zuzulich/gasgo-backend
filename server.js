@@ -5,7 +5,11 @@ import productsRoutes from './routes/products.js';
 import ordersRoutes from './routes/orders.js';
 import usersRoutes from './routes/users.js';
 
-dotenv.config();
+
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+} 
+
 const app = express();
 
 app.use(cors({
@@ -25,5 +29,6 @@ app.get('/', (req, res) => {
   res.send('API Gasgo funcionando 🔥');
 });
 
+// Railway inyecta el puerto. Si no lo encuentra, usa 3000 (para local).
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
