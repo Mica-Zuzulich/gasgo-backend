@@ -14,8 +14,5 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false } 
 });
 
-pool.connect()
-  .then(() => console.log('Conectado a PostgreSQL en Railway'))
-  .catch(err => console.error('Error al conectar a PostgreSQL', err));
 
 export default pool;
