@@ -5,9 +5,7 @@ import productsRoutes from './routes/products.js';
 import ordersRoutes from './routes/orders.js';
 import usersRoutes from './routes/users.js';
 
-if (!process.env.DATABASE_URL) {
-  dotenv.config();
-} 
+
 
 const app = express();
 
