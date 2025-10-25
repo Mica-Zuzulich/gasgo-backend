@@ -25,17 +25,21 @@ export const createOrder = async (req, res) => {
   try {
     await client.query('BEGIN'); // INICIAR TRANSACCIÓN
 
-    const { user_id, total, estado, productos } = req.body; 
+    // 🚨 CORREGIDO: Extraer todos los campos que envía el frontend
+    const { user_id, total, estado, productos, direccion_entrega, ubicacion_lat, ubicacion_lon } = req.body; 
 
-    if (!user_id || !total || total <= 0 || !estado || !productos?.length) {
+    // También verificamos que se envíe la dirección
+    if (!user_id || !total || total <= 0 || !estado || !productos?.length || !direccion_entrega) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'Datos de pedido incompletos' });
+      return res.status(400).json({ error: 'Datos de pedido incompletos o falta la dirección de entrega' });
     }
 
     // 1. INSERTAR EL PEDIDO PRINCIPAL
+    // 🚨 CORREGIDO: Incluir las nuevas columnas en el INSERT y en los valores
     const orderResult = await client.query(
-      'INSERT INTO orders (user_id, total, estado, created_at) VALUES ($1, $2, $3, NOW()) RETURNING *',
-      [user_id, total, estado] 
+      `INSERT INTO orders (user_id, total, estado, direccion_entrega, ubicacion_lat, ubicacion_lon, created_at) 
+       VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *`,
+      [user_id, total, estado, direccion_entrega, ubicacion_lat, ubicacion_lon] // <-- Se pasan 6 valores
     );
     const orderId = orderResult.rows[0].id;
 
@@ -59,9 +63,9 @@ export const createOrder = async (req, res) => {
 
   } catch (error) {
     await client.query('ROLLBACK'); // DESHACER CAMBIOS (si algo falló)
+    // 🚨 Importante: Este error puede seguir siendo por falta de columnas en la DB (direccion_entrega, ubicacion_lat/lon)
     console.error('Error al crear pedido (TRANSACCIÓN FALLIDA):', error.message || error);
-    // Devolvemos el error específico para debugging
-    res.status(500).json({ error: 'Error interno al crear pedido. Verifique que los productos existan y tengan precio unitario.' });
+    res.status(500).json({ error: 'Error interno al crear pedido. Verifique que las COLUMNAS de dirección existan en la tabla orders.' });
   } finally {
     client.release(); // LIBERAR CONEXIÓN
   }
