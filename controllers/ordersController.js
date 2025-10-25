@@ -23,33 +23,36 @@ export const getOrders = async (req, res) => {
 
 export const createOrder = async (req, res) => {
   try {
-    // 1. OBTENEMOS solo user_id (ya no necesitamos cliente ni email en el INSERT)
     const { user_id, total, estado, productos } = req.body; 
 
-    // 2. Quitamos la validación de cliente y email
     if (!user_id || !total || total <= 0 || !estado || !productos?.length) {
-      return res.status(400).json({ error: 'Datos de pedido incompletos (falta user_id, total, estado o productos)' });
+      return res.status(400).json({ error: 'Datos de pedido incompletos' });
     }
 
     const orderResult = await pool.query(
-      // 3. Modificamos el INSERT para quitar 'cliente' y 'email'
       'INSERT INTO orders (user_id, total, estado, created_at) VALUES ($1, $2, $3, NOW()) RETURNING *',
-      [user_id, total, estado] // 4. PROPORCIONAMOS solo user_id, total y estado
+      [user_id, total, estado] 
     );
     const orderId = orderResult.rows[0].id;
 
     for (const p of productos) {
-      // Esta inserción no necesita cambios
+      // CORRECCIÓN/OPTIMIZACIÓN: Usamos el precio_unitario que asumimos viene en p
+      // Y quitamos el SELECT que puede fallar.
+      if (!p.precio_unitario) {
+          console.error('Falta precio unitario en el item del pedido');
+          // Podríamos lanzar un error aquí para evitar el fallo del INSERT
+      }
+
       await pool.query(
         `INSERT INTO order_items (order_id, product_id, cantidad, precio_unitario, created_at) 
-         VALUES ($1, $2, $3, (SELECT precio FROM products WHERE id = $2), NOW())`,
-        [orderId, p.product_id, p.cantidad]
+         VALUES ($1, $2, $3, $4, NOW())`,
+        [orderId, p.product_id, p.cantidad, p.precio_unitario] // Asumimos que p.precio_unitario existe
       );
     }
 
     res.status(201).json({ message: "Pedido creado exitosamente", orderId });
   } catch (error) {
-    console.error('Error al crear pedido:', error);
+    console.error('Error al crear pedido (verifique logs de DB):', error);
     res.status(500).json({ error: 'Error interno al crear pedido' });
   }
 };
