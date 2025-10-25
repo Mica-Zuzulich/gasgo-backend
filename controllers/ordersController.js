@@ -3,7 +3,6 @@ import pool from '../config/db.js';
 export const getOrders = async (req, res) => {
   try {
     // 1. Usamos JOIN para vincular la tabla 'orders' con la tabla 'users'
-    // Esto trae el nombre y email del usuario que hizo el pedido.
     const query = `
       SELECT 
         o.*,
@@ -16,44 +15,55 @@ export const getOrders = async (req, res) => {
     const result = await pool.query(query);
     res.json(result.rows);
   } catch (error) {
-    console.error('Error al obtener pedidos', error);
+    console.error('Error al obtener pedidos (JOIN falló, verifica tabla users):', error);
     res.status(500).json({ error: 'Error al obtener pedidos' });
   }
 };
 
 export const createOrder = async (req, res) => {
+  const client = await pool.connect(); // Obtener un cliente de conexión
   try {
+    await client.query('BEGIN'); // INICIAR TRANSACCIÓN
+
     const { user_id, total, estado, productos } = req.body; 
 
     if (!user_id || !total || total <= 0 || !estado || !productos?.length) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ error: 'Datos de pedido incompletos' });
     }
 
-    const orderResult = await pool.query(
+    // 1. INSERTAR EL PEDIDO PRINCIPAL
+    const orderResult = await client.query(
       'INSERT INTO orders (user_id, total, estado, created_at) VALUES ($1, $2, $3, NOW()) RETURNING *',
       [user_id, total, estado] 
     );
     const orderId = orderResult.rows[0].id;
 
+    // 2. INSERTAR LOS ÍTEMS DEL PEDIDO
     for (const p of productos) {
-      // CORRECCIÓN/OPTIMIZACIÓN: Usamos el precio_unitario que asumimos viene en p
-      // Y quitamos el SELECT que puede fallar.
+      // Validación estricta del precio
       if (!p.precio_unitario) {
-          console.error('Falta precio unitario en el item del pedido');
-          // Podríamos lanzar un error aquí para evitar el fallo del INSERT
+          throw new Error('Falta precio unitario para un producto en el pedido.');
       }
 
-      await pool.query(
+      await client.query(
         `INSERT INTO order_items (order_id, product_id, cantidad, precio_unitario, created_at) 
          VALUES ($1, $2, $3, $4, NOW())`,
-        [orderId, p.product_id, p.cantidad, p.precio_unitario] // Asumimos que p.precio_unitario existe
+        [orderId, p.product_id, p.cantidad, p.precio_unitario]
       );
     }
+    
+    await client.query('COMMIT'); // CONFIRMAR TRANSACCIÓN (si todo fue bien)
 
     res.status(201).json({ message: "Pedido creado exitosamente", orderId });
+
   } catch (error) {
-    console.error('Error al crear pedido (verifique logs de DB):', error);
-    res.status(500).json({ error: 'Error interno al crear pedido' });
+    await client.query('ROLLBACK'); // DESHACER CAMBIOS (si algo falló)
+    console.error('Error al crear pedido (TRANSACCIÓN FALLIDA):', error.message || error);
+    // Devolvemos el error específico para debugging
+    res.status(500).json({ error: 'Error interno al crear pedido. Verifique que los productos existan y tengan precio unitario.' });
+  } finally {
+    client.release(); // LIBERAR CONEXIÓN
   }
 };
 
